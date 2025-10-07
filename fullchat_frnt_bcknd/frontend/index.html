@@ -51,7 +51,7 @@
                 try {
                     setLoading(true);
                     // Using axios as in your original file
-                    const res = await axios.post(`http://localhost:5000/${endpoint}`, data);
+                    const res = await axios.post(`https://new-resc-calc.vercel.app/${endpoint}`, data);
                     setLoading(false);
                     return res.data;
                 } catch (err) {
