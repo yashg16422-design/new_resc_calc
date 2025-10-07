@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rainwater Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    {/* Added Axios for backend calls, as in your original file */}
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body class="bg-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- Helper Components ---
+        const BotIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" /></svg>
+        );
+        const UserIcon = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        );
+
+        // --- Main Application Component ---
+        function App() {
+            // --- LOGIC FROM YOUR App.jsx (UNCHANGED) ---
+            const [messages, setMessages] = useState([
+                { type: "bot", text: "Hello! I can help you check rainwater recharge feasibility." }
+            ]);
+            const [inputs, setInputs] = useState({ area: "", rainfall: "", avlarea: "", groundwater: "", runoff: "" ,infiltration:""});
+            const [step, setStep] = useState(1);
+            const [loading, setLoading] = useState(false);
+
+            const chatEndRef = useRef(null);
+
+            useEffect(() => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages, loading]);
+
+            const appendMessage = (type, text) => setMessages(prev => [...prev, { type, text }]);
+
+            const handleInputChange = (e) => {
+                setInputs(prev => ({ ...prev, [e.target.name]: e.target.value }));
+            };
+
+            const callBackend = async (endpoint, data) => {
+                try {
+                    setLoading(true);
+                    // Using axios as in your original file
+                    const res = await axios.post(`http://localhost:5000/${endpoint}`, data);
+                    setLoading(false);
+                    return res.data;
+                } catch (err) {
+                    setLoading(false);
+                    // Displaying an error in the chat for better UX
+                    appendMessage("bot", `Sorry, I couldn't connect to the server. Please ensure the backend is running. [Error: ${err.message}]`);
+                    return { error: "Error fetching data" };
+                }
+            };
+
+            const handleFeasibility = async () => {
+                appendMessage("user", `Area: ${inputs.area} sqm, Rainfall: ${inputs.rainfall} mm, AvlArea: ${inputs.avlarea}, groundwater: ${inputs.groundwater || "N/A"},Runoff: ${inputs.runoff}`);
+                const res = await callBackend("api/feasibility", inputs);
+                if(res.result) {
+                    appendMessage("bot", res.result);
+                    setStep(2);
+                }
+            };
+
+            const handleCost = async () => {
+                appendMessage("user", "Yes, show me the cost estimate.");
+                const res = await callBackend("api/cost", inputs);
+                 if(res.cost) {
+                    appendMessage("bot", `Estimated Cost: ${res.cost}`);
+                    setStep(3);
+                }
+            };
+
+            const handleMaintenance = async () => {
+                appendMessage("user", "Please show maintenance cost.");
+                const res = await callBackend("api/maintenance", inputs);
+                if(res.maintenance) {
+                    appendMessage("bot", `Estimated Maintenance: ${res.maintenance}`);
+                    setStep(4);
+                }
+            };
+            // --- END OF YOUR UNCHANGED LOGIC ---
+
+
+            return (
+                <main className="font-sans min-h-screen flex items-center justify-center p-4 bg-grid">
+                    <style>{`
+                        .bg-grid { background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 30px 30px; }
+                        .input-style { width: 100%; background-color: rgb(15 23 42 / 0.5); border: 1px solid rgb(51 65 85); border-radius: 0.5rem; padding: 0.75rem 1rem; color: white; transition: all 0.3s; outline: none; }
+                        .input-style:focus { box-shadow: 0 0 0 2px rgb(99 102 241); border-color: rgb(99 102 241); }
+                        .input-style::placeholder { color: rgb(100 116 139); }
+                        .action-button { font-weight: bold; padding: 0.75rem 1.5rem; border-radius: 0.5rem; color: white; transition: background-color 0.3s ease; }
+                    `}</style>
+
+                    <div className="w-full max-w-2xl h-[90vh] mx-auto flex flex-col">
+                        <div className="bg-white/5 backdrop-blur-lg rounded-t-2xl shadow-2xl border-x border-t border-white/10 p-4 text-center">
+                            <h1 className="text-2xl font-bold text-white">Rainwater Recharge Assistant</h1>
+                        </div>
+                        
+                        <div className="flex-1 bg-slate-900/50 p-6 overflow-y-auto space-y-6">
+                            {messages.map((msg, index) => (
+                                <div key={index} className={`flex items-end gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    {msg.type === 'bot' && (
+                                        <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0"><BotIcon /></div>
+                                    )}
+                                    <div className={`max-w-md md:max-w-lg p-4 rounded-2xl ${msg.type === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-700 text-slate-200 rounded-bl-none'}`}>
+                                        <p>{msg.text}</p>
+                                    </div>
+                                    {msg.type === 'user' && (
+                                        <div className="w-10 h-10 rounded-full bg-slate-600 flex items-center justify-center flex-shrink-0"><UserIcon /></div>
+                                    )}
+                                </div>
+                            ))}
+                            {loading && (
+                                <div className="flex items-end gap-3 justify-start">
+                                    <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0"><BotIcon /></div>
+                                    <div className="bg-slate-700 text-slate-200 rounded-2xl rounded-bl-none p-4">
+                                        <div className="flex items-center justify-center space-x-1">
+                                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                            <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={chatEndRef} />
+                        </div>
+                        
+                        <div className="bg-white/5 backdrop-blur-lg rounded-b-2xl shadow-2xl border-x border-b border-white/10 p-4">
+                            {/* This section now uses your original step-based rendering logic */}
+                            {step === 1 && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <input name="area" type="number" placeholder="Plot Area (sqm)" value={inputs.area} onChange={handleInputChange} className="input-style" />
+                                        <input name="rainfall" type="number" placeholder="Annual Rainfall (mm)" value={inputs.rainfall} onChange={handleInputChange} className="input-style" />
+                                        <input name="avlarea" type="number" placeholder="Available Area" value={inputs.avlarea} onChange={handleInputChange} className="input-style" />
+                                        <input name="groundwater" type="number" placeholder="groundwater level" value={inputs.groundwater} onChange={handleInputChange} className="input-style" />
+                                        <input name="runoff" type="number" placeholder="Runoff Co-efficient" value={inputs.runoff} onChange={handleInputChange} className="input-style" />
+                                        <input name="infiltration" type="text" placeholder="Infiltration Type "value={inputs.infiltration} onChange={handleInputChange} className="input-style" />
+
+                                    </div>
+                                    <button onClick={handleFeasibility} disabled={loading} className="w-full action-button bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700">
+                                        {loading ? "Checking..." : "Check Feasibility"}
+                                    </button>
+                                </div>
+                            )}
+                            {step === 2 && (
+                                <button onClick={handleCost} disabled={loading} className="w-full action-button bg-green-600 hover:bg-green-700 disabled:bg-slate-700">
+                                    {loading ? "Calculating..." : "Get Cost Estimate"}
+                                </button>
+                            )}
+                            {step === 3 && (
+                                <button onClick={handleMaintenance} disabled={loading} className="w-full action-button bg-sky-600 hover:bg-sky-700 disabled:bg-slate-700">
+                                    {loading ? "Calculating..." : "Get Maintenance Cost"}
+                                </button>
+                            )}
+                            {step === 4 && (
+                                <p className="text-center text-slate-400">Thank you for using the assistant!</p>
+                            )}
+                        </div>
+                    </div>
+                </main>
+            );
+        }
+
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
